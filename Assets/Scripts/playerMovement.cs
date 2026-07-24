@@ -52,6 +52,11 @@ public class PlayerMovement2D : MonoBehaviour
     public LayerMask wallLayer;
     private bool isTouchingWall;
 
+    [Header("One Way Platform Settings")]
+    public LayerMask oneWayLayer;
+    private Collider2D playerCollider;
+    private bool isDroppingThroughPlatform;
+
     private Rigidbody2D rb;
     private Vector2 moveInput;
     private float facingDirection = 1f;
@@ -84,6 +89,7 @@ public class PlayerMovement2D : MonoBehaviour
     void Start()
     {
         rb = GetComponent<Rigidbody2D>();
+        playerCollider = GetComponent<Collider2D>();
         originalGravity = rb.gravityScale;
     }
 
@@ -120,7 +126,7 @@ public class PlayerMovement2D : MonoBehaviour
         }
 
         // Deteksi Pijakan & Dinding
-        isGrounded = Physics2D.OverlapBox(groundCheck.position, groundCheckSize, 0f, groundLayer);
+        isGrounded = Physics2D.OverlapBox(groundCheck.position, groundCheckSize, 0f, groundLayer | oneWayLayer | wallLayer);
         isTouchingWall = Physics2D.OverlapBox(wallCheck.position, wallCheckSize, 0f, wallLayer);
 
         // Logika Grounding & Coyote Time
@@ -141,7 +147,7 @@ public class PlayerMovement2D : MonoBehaviour
         }
 
         // Logika Wall Slide
-        if (isTouchingWall && !isGrounded && rb.linearVelocity.y < 0)
+        if (isTouchingWall && !isGrounded && rb.linearVelocity.y <= 0f)
         {
             isWallSliding = true;
         }
@@ -174,8 +180,8 @@ public class PlayerMovement2D : MonoBehaviour
                 rb.linearVelocity = new Vector2(targetSpeed, rb.linearVelocity.y);
             }
 
-            // Fast Fall saat menekan bawah di udara
-            if (!isGrounded && moveInput.y < 0f)
+            // Fast Fall saat menekan bawah di udara (hanya jika tidak sedang proses turun platform)
+            if (!isGrounded && moveInput.y < 0f && !isDroppingThroughPlatform)
             {
                 rb.linearVelocity = new Vector2(rb.linearVelocity.x, -fastFallSpeed);
             }
@@ -188,12 +194,47 @@ public class PlayerMovement2D : MonoBehaviour
 
         if (coyoteTimeCounter > 0f)
         {
-            Jump();
+            // Jika menekan tombol BAWAH (S / Panah Bawah) saat berada di atas One-Way Platform
+            Collider2D oneWayPlatform = Physics2D.OverlapBox(groundCheck.position, groundCheckSize, 0f, oneWayLayer);
+            if (moveInput.y < 0f && oneWayPlatform != null)
+            {
+                StartCoroutine(DisableOneWayCollision(oneWayPlatform));
+            }
+            else
+            {
+                Jump();
+            }
         }
         else if (isWallSliding)
         {
             WallJump();
         }
+    }
+
+    private IEnumerator DisableOneWayCollision(Collider2D platformCollider)
+    {
+        if (playerCollider == null) yield break;
+
+        isDroppingThroughPlatform = true;
+        
+        // Beri dorongan kecil ke bawah agar karakter langsung keluar dari permukaan atas platform secara mulus
+        rb.linearVelocity = new Vector2(rb.linearVelocity.x, -3f);
+
+        Collider2D[] colliders = Physics2D.OverlapBoxAll(groundCheck.position, groundCheckSize, 0f, oneWayLayer);
+        
+        foreach (var col in colliders)
+        {
+            if (col != null) Physics2D.IgnoreCollision(playerCollider, col, true);
+        }
+
+        yield return new WaitForSeconds(0.3f);
+
+        foreach (var col in colliders)
+        {
+            if (col != null) Physics2D.IgnoreCollision(playerCollider, col, false);
+        }
+
+        isDroppingThroughPlatform = false;
     }
 
     private void OnJumpCanceled(InputAction.CallbackContext context)

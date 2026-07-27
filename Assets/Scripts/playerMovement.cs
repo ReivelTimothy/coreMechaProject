@@ -57,6 +57,7 @@ public class PlayerMovement2D : MonoBehaviour
     private Collider2D playerCollider;
     private bool isDroppingThroughPlatform;
 
+    private Animator anim;
     private Rigidbody2D rb;
     private Vector2 moveInput;
     private float facingDirection = 1f;
@@ -91,10 +92,13 @@ public class PlayerMovement2D : MonoBehaviour
         rb = GetComponent<Rigidbody2D>();
         playerCollider = GetComponent<Collider2D>();
         originalGravity = rb.gravityScale;
+        anim = GetComponent<Animator>();
     }
 
     void Update()
     {
+        UpdateAnimator();
+
         if (isDashing) return;
 
         moveInput = moveAction.ReadValue<Vector2>();
@@ -155,6 +159,17 @@ public class PlayerMovement2D : MonoBehaviour
         {
             isWallSliding = false;
         }
+    }
+
+    private void UpdateAnimator()
+    {
+        if (anim == null) return;
+
+        anim.SetFloat("Speed", Mathf.Abs(moveInput.x));
+        anim.SetFloat("VelocityY", rb.linearVelocity.y);
+        anim.SetBool("IsGrounded", isGrounded);
+        anim.SetBool("IsWallSliding", isWallSliding);
+        anim.SetBool("IsDashing", isDashing);
     }
 
     void FixedUpdate()
@@ -258,6 +273,11 @@ public class PlayerMovement2D : MonoBehaviour
     {
         rb.linearVelocity = new Vector2(rb.linearVelocity.x, jumpForce);
         coyoteTimeCounter = 0f;
+
+        if (AudioManager.Instance != null)
+        {
+            AudioManager.Instance.PlayJumpSFX();
+        }
     }
 
     void WallJump()
@@ -269,12 +289,22 @@ public class PlayerMovement2D : MonoBehaviour
         rb.linearVelocity = new Vector2(kickDirection * wallJumpForce.x, wallJumpForce.y);
 
         Flip();
+
+        if (AudioManager.Instance != null)
+        {
+            AudioManager.Instance.PlayJumpSFX();
+        }
     }
 
     private IEnumerator PerformDash()
     {
         canDash = false;
         isDashing = true;
+
+        if (AudioManager.Instance != null)
+        {
+            AudioManager.Instance.PlayDashSFX();
+        }
 
         rb.gravityScale = 0f;
         rb.linearVelocity = Vector2.zero; // Menghapus momentum lama agar dash lurus

@@ -10,6 +10,10 @@ public class PlayerHealth : MonoBehaviour
     [Header("Respawn Settings")]
     public Vector3 currentRespawnPoint;
 
+    [Header("Game Over UI")]
+    public GameObject gameOverPanel;
+    public UnityEngine.UI.Button retryButton;
+
     private Rigidbody2D rb;
 
     private void Start()
@@ -19,6 +23,16 @@ public class PlayerHealth : MonoBehaviour
 
         // Set titik respawn awal ke posisi tempat Player pertama kali ditaruh di Map
         currentRespawnPoint = transform.position;
+
+        if (gameOverPanel != null)
+        {
+            gameOverPanel.SetActive(false);
+        }
+
+        if (retryButton != null)
+        {
+            retryButton.onClick.AddListener(RestartGame);
+        }
     }
 
     public void TakeDamage(int damage)
@@ -28,6 +42,11 @@ public class PlayerHealth : MonoBehaviour
 
         if (currentHealth > 0)
         {
+            if (AudioManager.Instance != null)
+            {
+                AudioManager.Instance.PlayHurtSFX();
+            }
+
             Respawn();
         }
         else
@@ -52,8 +71,41 @@ public class PlayerHealth : MonoBehaviour
 
     private void Die()
     {
-        Debug.Log("HP Habis! Game Over / Reload Scene.");
-        // Reload scene saat ini jika HP habis (otomatis reset ke titik awal map)
+        Debug.Log("HP Habis! Game Over.");
+
+        if (AudioManager.Instance != null)
+        {
+            AudioManager.Instance.PlayDieSFX();
+        }
+
+        // Matikan pergerakan/karakter jika perlu
+        gameObject.SetActive(false);
+
+        // Freeze game dan tampilkan Game Over Panel "YOU DIED!"
+        if (gameOverPanel != null)
+        {
+            gameOverPanel.SetActive(true);
+            Time.timeScale = 0f;
+        }
+        else
+        {
+            RestartGame();
+        }
+    }
+
+    public void RestartGame()
+    {
+        Time.timeScale = 1f;
+
+        if (AudioManager.Instance != null)
+        {
+            AudioManager.Instance.PlayButtonClickSFX();
+            AudioManager.Instance.PlayInGameBGM();
+        }
+
+        // Tandai bahwa game di-restart secara langsung (melewati Main Menu)
+        MainMenuUI.shouldAutoStartGame = true;
+
         SceneManager.LoadScene(SceneManager.GetActiveScene().name);
     }
 
